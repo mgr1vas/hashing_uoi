@@ -23,6 +23,11 @@ The application is divided into three main functional parts:
 * **OTP Generation**: Uses a secret key to generate a dynamic One-Time Password (OTP).
 * **Access Control**: Protects critical operations, such as integrity checks, by requiring a valid 6-digit code before execution.
 
+### Questions and Answers
+- Γιατί ένα encrypted αρχείο έχει entropy κοντά στο 8;
+    - Η κρυπτογράφηση έχει ως στόχο να κάνει τα δεδομένα να φαίνονται εντελώς τυχαία (noise). Σε ένα ιδανικά κρυπτογραφημένο αρχείο, κάθε μία από τις 256 δυνατές τιμές byte εμφανίζεται με την ίδια ακριβώς πιθανότητα. Όταν η πιθανότητα είναι ομοιόμορφη, η εντροπία Shannon φτάνει στο μέγιστο όριό της, που είναι το log2​(256)=8.
+- Γιατί ένα απλό text αρχείο έχει μικρότερη εντροπία;
+    - Σε ένα αρχείο κειμένου, τα δεδομένα είναι προβλέψιμα και μη ομοιόμορφα. Χρησιμοποιείται μόνο ένα μικρό υποσύνολο των διαθέσιμων bytes (π.χ. μόνο ASCII χαρακτήρες, κενά, αλλαγές γραμμής). Επειδή ορισμένα bytes εμφανίζονται πολύ συχνά (π.χ. το "e" ή το κενό) και άλλα καθόλου, η "αβεβαιότητα" των δεδομένων μειώνεται, οδηγώντας σε χαμηλότερη τιμή εντροπίας.
 
 ## Project Structure
 
@@ -31,7 +36,6 @@ The application is divided into three main functional parts:
 ├── src/
 │   ├── main.py         
 │   ├── hashing.py
-│   ├── auth.py
 │   ├── entropy.py       
 ├── README.md        
 ├── requirements.txt    
