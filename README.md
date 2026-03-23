@@ -31,6 +31,7 @@ The application is divided into three main functional parts:
 ├── src/
 │   ├── main.py         
 │   ├── hashing.py
+│   ├── auth.py
 │   ├── entropy.py       
 ├── README.md        
 ├── requirements.txt    
