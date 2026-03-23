@@ -11,7 +11,7 @@ def get_file_hash(filename, algorithm='sha256'):
     if not hash_obj: return None
 
     try:
-        with open(filename, 'rb') as f: # Read in binary mode [cite: 13, 63]
+        with open(filename, 'rb') as f: # Read in binary mode
             while chunk := f.read(4096):
                 hash_obj.update(chunk)
         return hash_obj.hexdigest()
@@ -19,7 +19,7 @@ def get_file_hash(filename, algorithm='sha256'):
         return None
 
 def save_hash(filename, hash_value):
-    with open(f"{filename}.hash", "w") as f: # Save to filename.hash [cite: 24, 82]
+    with open(f"{filename}.hash", "w") as f: # Save to filename.hash
         f.write(hash_value)
 
 def verify_integrity(filename, algorithm):
