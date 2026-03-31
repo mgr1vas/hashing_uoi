@@ -4,7 +4,6 @@ import auth
 
 def menu():
     user_secret = auth.generate_secret()
-    
     while True:
         print("\n Interactive Menu")
         print("1. Calculate Hash")
@@ -13,7 +12,6 @@ def menu():
         print("4. Exit")
         
         choice = input("Select option: ")
-
         if choice == '1':
             fname = input("Enter filename: ")
             algo = input("Choose algorithm (md5, sha1, sha256, sha3): ")
@@ -24,7 +22,6 @@ def menu():
                 print("Hash saved successfully.")
             else:
                 print("Error: File not found.")
-
         elif choice == '2':
             # Critical action: requires 2FA first
             if auth.verify_2fa(user_secret):
@@ -39,7 +36,6 @@ def menu():
                     print("Error: Stored hash file not found.")
             else:
                 print("Access Denied: Wrong OTP.")
-
         elif choice == '3':
             fname = input("Enter filename: ")
             ent = entropy.calculate_entropy(fname)
@@ -49,7 +45,6 @@ def menu():
                     print("Note: High randomness (likely encrypted/compressed).")
                 else:
                     print("Note: Low randomness (likely simple data).")
-
         elif choice == '4':
             print("Exiting...")
             break
