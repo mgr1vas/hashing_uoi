@@ -6,10 +6,8 @@ def calculate_entropy(filename):
         with open(filename, 'rb') as f: # Binary mode
             data = f.read()
         if not data: return 0.0
-
         file_size = len(data)
         byte_counts = Counter(data) # Count occurrences of each byte
-        
         entropy = 0
         for count in byte_counts.values():
             p_x = count / file_size # Calculate probability p(x)
