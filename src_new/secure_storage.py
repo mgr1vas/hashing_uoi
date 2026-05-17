@@ -24,19 +24,19 @@ def initialize_system():
         if not f.exists():
             f.write_text(json.dumps(default))
 
+# =====================================================================
 # PART A: Hash & Salt (Reused Logic from Assignment 1)
+# =====================================================================
 import hashlib
 
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     try:
         if salt is None:
-            # Generate a random 16-byte secure salt
             salt_bytes = os.urandom(16)
         else:
             salt_bytes = bytes.fromhex(salt)
             
         hasher = hashlib.sha256()
-        # Apply salt before the password data
         hasher.update(salt_bytes)
         hasher.update(password.encode())
         
@@ -46,15 +46,15 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
 
 def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     try:
-        # Recompute the hash with the given salt and check for equality
         current_hash, _ = hash_password(password, salt)
         return current_hash == stored_hash
     except Exception:
         return False
 
+# =====================================================================
 # PART B: OTP & User Registration
+# =====================================================================
 def admin_issue_otp(username: str) -> str:
-    # Generates a random 8-character hex OTP for the given user
     otp = secrets.token_hex(4).upper()
     store = json.loads(OTP_DB.read_text())
     store[username] = {
@@ -73,23 +73,19 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             return False
         otp_store = json.loads(OTP_DB.read_text())
         
-        # Verify user has an OTP record
         if username not in otp_store:
             print("[ERROR] No OTP record found for this username.")
             return False
             
         user_otp_data = otp_store[username]
-        # Check if the OTP was already consumed
         if user_otp_data.get("used") is True:
             print("[ERROR] This OTP has already been used.")
             return False
             
-        # Case-insensitive OTP verification
         if otp_input.strip().upper() != user_otp_data.get("otp").upper():
             print("[ERROR] Invalid OTP supplied.")
             return False
             
-        # Mark OTP as consumed and commit changes
         user_otp_data["used"] = True
         OTP_DB.write_text(json.dumps(otp_store, indent=2))
         
@@ -98,7 +94,6 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             print("[ERROR] Username is already registered.")
             return False
             
-        # Compute credentials using Part A function
         p_hash, p_salt = hash_password(password)
         
         users_data[username] = {
@@ -108,7 +103,6 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         }
         USERS_DB.write_text(json.dumps(users_data, indent=2))
         
-        # Trigger automatic key generation
         generate_user_keys(username)
         print(f"[SUCCESS] User '{username}' registered successfully!")
         return True
@@ -116,7 +110,9 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         print(f"[ERROR] Registration failed: {e}")
         return False
 
+# =====================================================================
 # PART C: Authentication
+# =====================================================================
 def authenticate_user(username: str, password: str) -> bool:
     try:
         if not USERS_DB.exists():
@@ -130,9 +126,8 @@ def authenticate_user(username: str, password: str) -> bool:
             
         user_info = users_data[username]
         stored_hash = user_info["password_hash"]
-        stored_salt = user_info["salt"] # Get the stored salt for this user
+        stored_salt = user_info["salt"]
         
-        # Get the hash of the provided password using the stored salt and compare
         if verify_password(password, stored_hash, stored_salt):
             return True
         else:
@@ -141,7 +136,9 @@ def authenticate_user(username: str, password: str) -> bool:
     except Exception:
         return False
 
+# =====================================================================
 # PART D: RSA Keys (Provided Functions)
+# =====================================================================
 def generate_user_keys(username: str):
     pk = rsa.generate_private_key(65537, 2048, default_backend())
     (KEYS_DIR / f"{username}_private.pem").write_bytes(
@@ -166,25 +163,29 @@ def load_public_key(username: str):
         backend=default_backend()
     )
 
-# PART E: Nonce / Anti-Replay
+# =====================================================================
+# PART E: Nonce / Anti-Replay (Updated based on image_3858c5.png)
+# =====================================================================
 def generate_nonce() -> str:
     return secrets.token_hex(16)
 
 def is_nonce_valid(nonce: str) -> bool:
     try:
         nonces = json.loads(NONCE_DB.read_text()) if NONCE_DB.exists() else []
-        # Check for replay attack condition
+        # Step 16: If nonce is already in the list, print warning and return False
         if nonce in nonces:
             print(f"[WARNING] Replay Attack Detected! Nonce '{nonce}' has already been processed.")
             return False
-        # Append and commit new nonce
+        # Step 17: If it is new, add to list, save file, and return True
         nonces.append(nonce)
         NONCE_DB.write_text(json.dumps(nonces, indent=2))
         return True
     except Exception:
         return False
 
+# =====================================================================
 # PART F: Encryption & Signature
+# =====================================================================
 def encrypt_file(data: bytes) -> tuple:
     try:
         key = os.urandom(32)
@@ -229,28 +230,35 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
         print("[WARNING] Invalid cryptographic signature detected!")
         return False
 
-# PART Z: Upload, Download & CLI Loop
+# =====================================================================
+# PART Z: Upload, Download & CLI Loop (Updated based on image_38584b.png & image_385886.png)
+# =====================================================================
 def upload_file(username: str, filepath: str):
     try:
         path = Path(filepath)
         if not path.exists():
             print("[ERROR] Local file path does not exist.")
             return
+            
+        # Step 30: Read bytes
         data = path.read_bytes()
+        # Step 31: Generate nonce
         nonce = generate_nonce()
-        
-        # Create cryptographic signature
+        # Step 32: Sign data
         signature = sign_data(username, data, nonce)
-        # Validate nonce against anti-replay database
+        
+        # Step 33: Check nonce
         if not is_nonce_valid(nonce):
             print("[ERROR] Request aborted due to nonce invalidation.")
             return
             
-        # Perform file symmetric encryption
+        # Step 34: Encrypt file
         ciphertext, key, nonce_aes = encrypt_file(data)
+        
+        # Step 35: Store encrypted bytes to STORAGE_DIR/<filename>.enc
         (STORAGE_DIR / f"{path.name}.enc").write_bytes(ciphertext)
         
-        # Package securely encoded metadata payload
+        # Step 36: Store metadata JSON
         metadata = {
             "signature": base64.b64encode(signature).decode('utf-8'),
             "key": base64.b64encode(key).decode('utf-8'),
@@ -273,21 +281,26 @@ def download_file(username: str, filename: str):
             print("[ERROR] Secure storage files or metadata missing for this item.")
             return
             
+        # Step 37: Load metadata JSON
         metadata = json.loads(json_path.read_text())
+        # Step 38: Read encrypted bytes from .enc file
         ciphertext = enc_path.read_bytes()
         
-        # Convert base64 fields back to bytes
+        # Step 39: Decode base64 parameters
         key = base64.b64decode(metadata["key"])
         nonce_aes = base64.b64decode(metadata["nonce_aes"])
         signature = base64.b64decode(metadata["signature"])
         nonce = metadata["nonce"]
         
-        # Symmetric decryption pipeline
+        # Step 40: Decrypt file
         plaintext = decrypt_file(ciphertext, key, nonce_aes)
-        # Validate file creator ownership via signature
+        
+        # Step 41: Verify signature (verify_signature prints warning if fails)
         if verify_signature(metadata["uploader"], plaintext, nonce, signature):
-            Path(f"downloaded_{metadata['original_filename']}").write_bytes(plaintext)
-            print(f"[SUCCESS] File downloaded and verified as 'downloaded_{metadata['original_filename']}'.")
+            # Step 42: Store locally as downloaded_<original_filename>
+            out_path = Path(f"downloaded_{metadata['original_filename']}")
+            out_path.write_bytes(plaintext)
+            print(f"[SUCCESS] File downloaded and verified as '{out_path.name}'.")
         else:
             print("[ERROR] Cryptographic signature check completely failed!")
     except Exception:
@@ -295,7 +308,7 @@ def download_file(username: str, filename: str):
 
 def show_menu():
     print("\n" + "="*48)
-    print("Secure File Storage System - Main Menu")
+    print("           Secure File Storage System           ")
     print("="*48)
     print(" 1. Register User (with OTP)")
     print(" 2. Login User")
