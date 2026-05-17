@@ -24,9 +24,7 @@ def initialize_system():
         if not f.exists():
             f.write_text(json.dumps(default))
 
-# =====================================================================
 # PART A: Hash & Salt (Reused Logic from Assignment 1)
-# =====================================================================
 import hashlib
 
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
@@ -51,9 +49,7 @@ def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     except Exception:
         return False
 
-# =====================================================================
 # PART B: OTP & User Registration
-# =====================================================================
 def admin_issue_otp(username: str) -> str:
     otp = secrets.token_hex(4).upper()
     store = json.loads(OTP_DB.read_text())
@@ -110,9 +106,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         print(f"[ERROR] Registration failed: {e}")
         return False
 
-# =====================================================================
 # PART C: Authentication
-# =====================================================================
 def authenticate_user(username: str, password: str) -> bool:
     try:
         if not USERS_DB.exists():
@@ -136,9 +130,7 @@ def authenticate_user(username: str, password: str) -> bool:
     except Exception:
         return False
 
-# =====================================================================
 # PART D: RSA Keys (Provided Functions)
-# =====================================================================
 def generate_user_keys(username: str):
     pk = rsa.generate_private_key(65537, 2048, default_backend())
     (KEYS_DIR / f"{username}_private.pem").write_bytes(
@@ -163,9 +155,7 @@ def load_public_key(username: str):
         backend=default_backend()
     )
 
-# =====================================================================
 # PART E: Nonce / Anti-Replay (Updated based on image_3858c5.png)
-# =====================================================================
 def generate_nonce() -> str:
     return secrets.token_hex(16)
 
@@ -183,9 +173,7 @@ def is_nonce_valid(nonce: str) -> bool:
     except Exception:
         return False
 
-# =====================================================================
 # PART F: Encryption & Signature
-# =====================================================================
 def encrypt_file(data: bytes) -> tuple:
     try:
         key = os.urandom(32)
@@ -230,9 +218,7 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
         print("[WARNING] Invalid cryptographic signature detected!")
         return False
 
-# =====================================================================
 # PART Z: Upload, Download & CLI Loop (Updated based on image_38584b.png & image_385886.png)
-# =====================================================================
 def upload_file(username: str, filepath: str):
     try:
         path = Path(filepath)
