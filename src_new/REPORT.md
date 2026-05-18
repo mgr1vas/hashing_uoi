@@ -62,7 +62,9 @@ The CLI loop establishes strict access control parameters. Options like secure u
 -  *Description:* Captures the terminal output executing the integrated simulation workflow, where a duplicate request nonce is detected within the database, prompting a direct application abort to safeguard the storage pipeline.
 
 ### File Structure
+```
 Assignment_2_2931.zip
 │
 ├── secure_storage.py
 └── REPORT.md
+```
