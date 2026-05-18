@@ -24,17 +24,21 @@ def initialize_system():
         if not f.exists():
             f.write_text(json.dumps(default))
 
-# PART A: Hash & Salt (Reused Logic from Assignment 1)
+# PART A: Hash & Salt (Credential Storage Architecture)
 import hashlib
 
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     try:
         if salt is None:
+            # Generates a cryptographically secure random 16-byte salt per user.
+            # Mitigates Rainbow Table attacks and ensures identical passwords result in distinct hashes.
             salt_bytes = os.urandom(16)
         else:
             salt_bytes = bytes.fromhex(salt)
             
         hasher = hashlib.sha256()
+        # Prepends the unique salt before feeding the password bytes into the SHA-256 pipeline.
+        # This prevents trivial pre-computation matching by attackers.
         hasher.update(salt_bytes)
         hasher.update(password.encode())
         
@@ -44,13 +48,15 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
 
 def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     try:
+        # Recomputes the hash using the identical stored salt to achieve a deterministic comparison.
         current_hash, _ = hash_password(password, salt)
         return current_hash == stored_hash
     except Exception:
         return False
 
-# PART B: OTP & User Registration
+# PART B: OTP & User Registration Flow
 def admin_issue_otp(username: str) -> str:
+    # Generates an 8-character single-use token providing out-of-band pre-authorization.
     otp = secrets.token_hex(4).upper()
     store = json.loads(OTP_DB.read_text())
     store[username] = {
@@ -74,6 +80,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             return False
             
         user_otp_data = otp_store[username]
+        # Strict enforcement of the "One-Time" constraint to mitigate token reuse risks.
         if user_otp_data.get("used") is True:
             print("[ERROR] This OTP has already been used.")
             return False
@@ -82,6 +89,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             print("[ERROR] Invalid OTP supplied.")
             return False
             
+        # State-change mapping. Marks the token consumed before writing user records.
         user_otp_data["used"] = True
         OTP_DB.write_text(json.dumps(otp_store, indent=2))
         
@@ -92,6 +100,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             
         p_hash, p_salt = hash_password(password)
         
+        # Persists only the derivative hash and unique salt. Plaintext credentials are never saved.
         users_data[username] = {
             "password_hash": p_hash,
             "salt": p_salt,
@@ -99,6 +108,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         }
         USERS_DB.write_text(json.dumps(users_data, indent=2))
         
+        # Triggers automated asymmetric key generation upon verified registration bounds.
         generate_user_keys(username)
         print(f"[SUCCESS] User '{username}' registered successfully!")
         return True
@@ -114,6 +124,9 @@ def authenticate_user(username: str, password: str) -> bool:
             return False
             
         users_data = json.loads(USERS_DB.read_text())
+        
+        # Surface an identical, generic error message whether the user exists or not.
+        # This addresses User Enumeration side-channel attacks, hiding database state from attackers.
         if username not in users_data:
             print("[ERROR] Invalid login credentials")
             return False
@@ -130,14 +143,17 @@ def authenticate_user(username: str, password: str) -> bool:
     except Exception:
         return False
 
-# PART D: RSA Keys (Provided Functions)
+# PART D: Asymmetric Key Infrastructure (RSA-2048)
 def generate_user_keys(username: str):
+    # Establishes asymmetric RSA key pair with standard public exponent 65537 and strong 2048-bit modulus length.
     pk = rsa.generate_private_key(65537, 2048, default_backend())
+    # Exports the Private Key securely with No Encryption (unencrypted format for automated programmatic signing tasks).
     (KEYS_DIR / f"{username}_private.pem").write_bytes(
         pk.private_bytes(serialization.Encoding.PEM,
                          serialization.PrivateFormat.TraditionalOpenSSL,
                          serialization.NoEncryption())
     )
+    # Exports the corresponding Public Key using the standard SubjectPublicKeyInfo format for general validation distribution.
     (KEYS_DIR / f"{username}_public.pem").write_bytes(
         pk.public_key().public_bytes(serialization.Encoding.PEM,
                                      serialization.PublicFormat.SubjectPublicKeyInfo)
@@ -155,29 +171,38 @@ def load_public_key(username: str):
         backend=default_backend()
     )
 
-# PART E: Nonce / Anti-Replay (Updated based on image_3858c5.png)
+# PART E: Nonce / Anti-Replay Validation System
 def generate_nonce() -> str:
     return secrets.token_hex(16)
 
 def is_nonce_valid(nonce: str) -> bool:
     try:
         nonces = json.loads(NONCE_DB.read_text()) if NONCE_DB.exists() else []
-        # Step 16: If nonce is already in the list, print warning and return False
+        
+        # Cross-references request nonce against an historical database array.
+        # Detects and prevents Message Replay Attacks where an attacker intercepts and resubmits a valid payload.
         if nonce in nonces:
             print(f"[WARNING] Replay Attack Detected! Nonce '{nonce}' has already been processed.")
             return False
-        # Step 17: If it is new, add to list, save file, and return True
+            
+        # Blacklists the unique identifier immediately upon first clean arrival.
         nonces.append(nonce)
         NONCE_DB.write_text(json.dumps(nonces, indent=2))
         return True
     except Exception:
         return False
 
-# PART F: Encryption & Signature
+# PART F: Symmetric Authenticated Encryption & Digital Signatures
 def encrypt_file(data: bytes) -> tuple:
     try:
+        # Generates a cryptographically strong, volatile 32-byte symmetric key for AES-256.
         key = os.urandom(32)
+        # Generates an essential, unique 12-byte initialization vector (nonce) for GCM mode.
+        # Prevents deterministic patterns if identical plaintext content blocks are encrypted.
         nonce_aes = os.urandom(12)
+        
+        # Utilizes AES-GCM mode providing Authenticated Encryption with Associated Data (AEAD).
+        # Simultaneously guarantees Confidentiality (privacy) and Integrity/Authenticity (tamper detection).
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce_aes, data, None)
         return ciphertext, key, nonce_aes
@@ -187,6 +212,8 @@ def encrypt_file(data: bytes) -> tuple:
 def decrypt_file(ciphertext: bytes, key: bytes, nonce_aes: bytes) -> bytes:
     try:
         aesgcm = AESGCM(key)
+        # Decryption automatically validates the implicit AEAD authentication tag.
+        # Throws an exception if any ciphertext or IV bit was modified, ensuring strict data integrity.
         return aesgcm.decrypt(nonce_aes, ciphertext, None)
     except Exception:
         return b""
@@ -194,7 +221,12 @@ def decrypt_file(ciphertext: bytes, key: bytes, nonce_aes: bytes) -> bytes:
 def sign_data(username: str, data: bytes, nonce: str) -> bytes:
     try:
         private_key = load_private_key(username)
+        # Binds the file content with the application nonce string into an immutable payload.
+        # This ties the cryptographic signature context directly to this specific session transaction request.
         payload = data + nonce.encode()
+        
+        # Uses secure RSA-PSS probabilistic padding paired with SHA-256 hashing.
+        # Provides mathematical proof of origin and guarantees Non-Repudiation (uploader cannot deny action).
         return private_key.sign(
             payload,
             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
@@ -207,6 +239,8 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
     try:
         public_key = load_public_key(username)
         payload = data + nonce.encode()
+        # Uses the uploader's Public Key to cryptographically authenticate authorship.
+        # Throws InvalidSignature if the file data, nonce value, or key pairing do not match perfectly.
         public_key.verify(
             sig,
             payload,
@@ -218,7 +252,7 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
         print("[WARNING] Invalid cryptographic signature detected!")
         return False
 
-# PART Z: Upload, Download & CLI Loop (Updated based on image_38584b.png & image_385886.png)
+# PART Z: System Pipelines & Storage Integration
 def upload_file(username: str, filepath: str):
     try:
         path = Path(filepath)
@@ -226,25 +260,22 @@ def upload_file(username: str, filepath: str):
             print("[ERROR] Local file path does not exist.")
             return
             
-        # Step 30: Read bytes
         data = path.read_bytes()
-        # Step 31: Generate nonce
         nonce = generate_nonce()
-        # Step 32: Sign data
+        
+        # Sequence ordering compliance. Signature is drawn across plaintext content and nonce first.
         signature = sign_data(username, data, nonce)
         
-        # Step 33: Check nonce
+        # Anti-replay enforcement gateway. If nonce assertion fails, execution aborts immediately.
         if not is_nonce_valid(nonce):
             print("[ERROR] Request aborted due to nonce invalidation.")
             return
             
-        # Step 34: Encrypt file
         ciphertext, key, nonce_aes = encrypt_file(data)
-        
-        # Step 35: Store encrypted bytes to STORAGE_DIR/<filename>.enc
         (STORAGE_DIR / f"{path.name}.enc").write_bytes(ciphertext)
         
-        # Step 36: Store metadata JSON
+        # Raw binary cryptographic components (signatures, keys, IVs) are converted to safe,
+        # ASCII-compliant Base64 strings to support cross-platform structure persistence inside flat JSON logs.
         metadata = {
             "signature": base64.b64encode(signature).decode('utf-8'),
             "key": base64.b64encode(key).decode('utf-8'),
@@ -267,23 +298,19 @@ def download_file(username: str, filename: str):
             print("[ERROR] Secure storage files or metadata missing for this item.")
             return
             
-        # Step 37: Load metadata JSON
         metadata = json.loads(json_path.read_text())
-        # Step 38: Read encrypted bytes from .enc file
         ciphertext = enc_path.read_bytes()
         
-        # Step 39: Decode base64 parameters
         key = base64.b64decode(metadata["key"])
         nonce_aes = base64.b64decode(metadata["nonce_aes"])
         signature = base64.b64decode(metadata["signature"])
         nonce = metadata["nonce"]
         
-        # Step 40: Decrypt file
         plaintext = decrypt_file(ciphertext, key, nonce_aes)
         
-        # Step 41: Verify signature (verify_signature prints warning if fails)
+        # Executes asymmetric signature verification on the recovered plaintext.
+        # This guarantees the item was not modified post-upload and mathematically identifies the uploader.
         if verify_signature(metadata["uploader"], plaintext, nonce, signature):
-            # Step 42: Store locally as downloaded_<original_filename>
             out_path = Path(f"downloaded_{metadata['original_filename']}")
             out_path.write_bytes(plaintext)
             print(f"[SUCCESS] File downloaded and verified as '{out_path.name}'.")
@@ -305,6 +332,7 @@ def show_menu():
 
 def main():
     initialize_system()
+    # Session state tracking variable initialization.
     logged_in_user = None
     
     while True:
@@ -321,15 +349,18 @@ def main():
             uname = input("Enter username: ").strip()
             pwd = input("Enter password: ").strip()
             if authenticate_user(uname, pwd):
+                # Binding identity state context to active execution scope.
                 logged_in_user = uname
                 print(f"[SESSION] Active login session established for: {logged_in_user}")
         elif choice == '3':
+            # Strict Access Control Check. Blocks data interaction pathways unless session identity is active.
             if logged_in_user is None:
                 print("[ERROR] Unauthenticated access. Please log in first.")
                 continue
             fpath = input("Enter file path to upload: ").strip()
             upload_file(logged_in_user, fpath)
         elif choice == '4':
+            # Strict Access Control Check. Blocks data interaction pathways unless session identity is active.
             if logged_in_user is None:
                 print("[ERROR] Unauthenticated access. Please log in first.")
                 continue
