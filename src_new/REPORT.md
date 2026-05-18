@@ -38,19 +38,31 @@ The CLI loop establishes strict access control parameters. Options like secure u
 ## 3. Screenshots & Verification Checkpoints
 
 ### 3.1 OTP User Register
-> **![Files Created](images/otp_register.png)** > *Description:* Displays the registration of the user.
+> **![Files Created](images/otp_register.png)**
+-  *Description:* Displays the registration of the user.
 
 ### 3.2 Admin OTP Issuance & User Registration
-> **![Files Created](images/files_created.png)** > *Description:* Displays the generation of the images created.
+> **![Files Created](images/files_created.png)** >
+-  *Description:* Displays the generation of the images created.
 
 ### 3.3 Secure Login Session
-> **![Login Session](images/login.png)** > *Description:* Demonstrates a successful user authentication instance updating the CLI global runtime state variables.
+> **![Login Session](images/login.png)** >
+-  *Description:* Demonstrates a successful user authentication instance updating the CLI global runtime state variables.
 
 ### 3.4 CLI Interface - Menu
-> **![Menu](images/menu.png)** > *Description:* Menu in the command line interface.
+> **![Menu](images/menu.png)** >
+- *Description:* Menu in the command line interface.
 
 ### 3.5 Cryptographic Download/Upload & Signature Validation
-> **![Upload Download](images/upload_download.png)** > *Description:* Demonstrates running the download/upload option to parse encrypted storage, perform symmetric recovery, authenticate authorship via public RSA keys, and map local extractions.
+> **![Upload Download](images/upload_download.png)** >
+-  *Description:* Demonstrates running the download/upload option to parse encrypted storage, perform symmetric recovery, authenticate authorship via public RSA keys, and map local extractions.
 
 ### 3.6 Replay Attack Interception
-> **![Replay Attack](images/replay_attack.png)** > *Description:* Captures the terminal output executing the integrated simulation workflow, where a duplicate request nonce is detected within the database, prompting a direct application abort to safeguard the storage pipeline.
+> **![Replay Attack](images/replay_attack.png)** >
+-  *Description:* Captures the terminal output executing the integrated simulation workflow, where a duplicate request nonce is detected within the database, prompting a direct application abort to safeguard the storage pipeline.
+
+### File Structure
+Assignment_2_2931.zip
+│
+├── secure_storage.py
+└── REPORT.md
