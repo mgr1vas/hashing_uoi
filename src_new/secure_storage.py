@@ -24,21 +24,21 @@ def initialize_system():
         if not f.exists():
             f.write_text(json.dumps(default))
 
-# PART A: Hash & Salt (Credential Storage Architecture)
+# PART A: Hash & Salt (Αρχιτεκτονική Αποθήκευσης Διαπιστευτηρίων)
 import hashlib
 
 def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     try:
         if salt is None:
-            # Generates a cryptographically secure random 16-byte salt per user.
-            # Mitigates Rainbow Table attacks and ensures identical passwords result in distinct hashes.
+            # Παράγει ένα κρυπτογραφικά ασφαλές τυχαίο salt 16 bytes ανά χρήστη.
+            # Αποτρέπει επιθέσεις με Rainbow Tables και διασφαλίζει ότι ίδιοι κωδικοί παράγουν διαφορετικά hashes.
             salt_bytes = os.urandom(16)
         else:
             salt_bytes = bytes.fromhex(salt)
             
         hasher = hashlib.sha256()
-        # Prepends the unique salt before feeding the password bytes into the SHA-256 pipeline.
-        # This prevents trivial pre-computation matching by attackers.
+        # Εισάγει το μοναδικό salt ΠΡΙΝ από τα bytes του κωδικού πρόσβασης στον αλγόριθμο SHA-256.
+        # Αυτό εμποδίζει την εύκολη αντιστοίχιση προ-υπολογισμένων τιμών από επιτιθέμενους.
         hasher.update(salt_bytes)
         hasher.update(password.encode())
         
@@ -48,15 +48,15 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
 
 def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     try:
-        # Recomputes the hash using the identical stored salt to achieve a deterministic comparison.
+        # Επανυπολογίζει το hash χρησιμοποιώντας το ίδιο αποθηκευμένο salt για να γίνει ντετερμινιστική σύγκριση.
         current_hash, _ = hash_password(password, salt)
         return current_hash == stored_hash
     except Exception:
         return False
 
-# PART B: OTP & User Registration Flow
+# PART B: OTP & Ροή Εγγραφής Χρήστη
 def admin_issue_otp(username: str) -> str:
-    # Generates an 8-character single-use token providing out-of-band pre-authorization.
+    # Παράγει ένα τυχαίο token 8 χαρακτήρων (μίας χρήσης) που λειτουργεί ως out-of-band προ-έγκριση εγγραφής.
     otp = secrets.token_hex(4).upper()
     store = json.loads(OTP_DB.read_text())
     store[username] = {
@@ -80,7 +80,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             return False
             
         user_otp_data = otp_store[username]
-        # Strict enforcement of the "One-Time" constraint to mitigate token reuse risks.
+        # Αυστηρή επιβολή του περιορισμού "Μίας Χρήσης" για την αποτροπή επαναχρησιμοποίησης του token.
         if user_otp_data.get("used") is True:
             print("[ERROR] This OTP has already been used.")
             return False
@@ -89,7 +89,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             print("[ERROR] Invalid OTP supplied.")
             return False
             
-        # State-change mapping. Marks the token consumed before writing user records.
+        # Αλλαγή κατάστασης: Σημαίνει το token ως χρησιμοποιημένο ΠΡΙΝ καταγράψει τα στοιχεία του χρήστη.
         user_otp_data["used"] = True
         OTP_DB.write_text(json.dumps(otp_store, indent=2))
         
@@ -100,7 +100,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
             
         p_hash, p_salt = hash_password(password)
         
-        # Persists only the derivative hash and unique salt. Plaintext credentials are never saved.
+        # Αποθηκεύει μόνο το παραγόμενο hash και το μοναδικό salt. Οι plaintext κωδικοί δεν αποθηκεύονται ποτέ.
         users_data[username] = {
             "password_hash": p_hash,
             "salt": p_salt,
@@ -108,7 +108,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         }
         USERS_DB.write_text(json.dumps(users_data, indent=2))
         
-        # Triggers automated asymmetric key generation upon verified registration bounds.
+        # Ενεργοποιεί την αυτόματη δημιουργία ασύμμετρων κλειδιών RSA μόλις ολοκληρωθεί η έγκυρη εγγραφή.
         generate_user_keys(username)
         print(f"[SUCCESS] User '{username}' registered successfully!")
         return True
@@ -116,7 +116,7 @@ def register_user(username: str, otp_input: str, password: str) -> bool:
         print(f"[ERROR] Registration failed: {e}")
         return False
 
-# PART C: Authentication
+# PART C: Αυθεντικοποίηση (Defense-in-Depth)
 def authenticate_user(username: str, password: str) -> bool:
     try:
         if not USERS_DB.exists():
@@ -125,8 +125,8 @@ def authenticate_user(username: str, password: str) -> bool:
             
         users_data = json.loads(USERS_DB.read_text())
         
-        # Surface an identical, generic error message whether the user exists or not.
-        # This addresses User Enumeration side-channel attacks, hiding database state from attackers.
+        # Εμφανίζει ένα πανομοιότυπο, γενικό μήνυμα σφάλματος είτε υπάρχει ο χρήστης είτε όχι.
+        # Αυτό αποτρέπει επιθέσεις User Enumeration (Απαρίθμηση Χρηστών), κρύβοντας την κατάσταση της βάσης.
         if username not in users_data:
             print("[ERROR] Invalid login credentials")
             return False
@@ -143,17 +143,17 @@ def authenticate_user(username: str, password: str) -> bool:
     except Exception:
         return False
 
-# PART D: Asymmetric Key Infrastructure (RSA-2048)
+# PART D: Ασύμμετρη Υποδομή Κλειδιών (RSA-2048)
 def generate_user_keys(username: str):
-    # Establishes asymmetric RSA key pair with standard public exponent 65537 and strong 2048-bit modulus length.
+    # Δημιουργεί ένα ασύμμετρο ζεύγος κλειδιών RSA με εκθέτη 65537 και ισχυρό μέγεθος modulus 2048-bit.
     pk = rsa.generate_private_key(65537, 2048, default_backend())
-    # Exports the Private Key securely with No Encryption (unencrypted format for automated programmatic signing tasks).
+    # Εξάγει το Ιδιωτικό Κλειδί χωρίς κρυπτογράφηση (NoEncryption) για αυτοματοποιημένη προγραμματιστική υπογραφή.
     (KEYS_DIR / f"{username}_private.pem").write_bytes(
         pk.private_bytes(serialization.Encoding.PEM,
                          serialization.PrivateFormat.TraditionalOpenSSL,
                          serialization.NoEncryption())
     )
-    # Exports the corresponding Public Key using the standard SubjectPublicKeyInfo format for general validation distribution.
+    # Εξάγει το αντίστοιχο Δημόσιο Κλειδί με τη standard μορφή SubjectPublicKeyInfo για χρήση στην επαλήθευση.
     (KEYS_DIR / f"{username}_public.pem").write_bytes(
         pk.public_key().public_bytes(serialization.Encoding.PEM,
                                      serialization.PublicFormat.SubjectPublicKeyInfo)
@@ -171,7 +171,7 @@ def load_public_key(username: str):
         backend=default_backend()
     )
 
-# PART E: Nonce / Anti-Replay Validation System
+# PART E: Σύστημα Ελέγχου Anti-Replay (Nonces)
 def generate_nonce() -> str:
     return secrets.token_hex(16)
 
@@ -179,30 +179,30 @@ def is_nonce_valid(nonce: str) -> bool:
     try:
         nonces = json.loads(NONCE_DB.read_text()) if NONCE_DB.exists() else []
         
-        # Cross-references request nonce against an historical database array.
-        # Detects and prevents Message Replay Attacks where an attacker intercepts and resubmits a valid payload.
+        # Διασταυρώνει το nonce του αιτήματος με το ιστορικό αρχείο καταγραφής.
+        # Ανιχνεύει και αποτρέπει Replay Attacks, όπου ένας επιθετικός υποκλέπτει και ξαναστέλνει ένα έγκυρο αίτημα.
         if nonce in nonces:
             print(f"[WARNING] Replay Attack Detected! Nonce '{nonce}' has already been processed.")
             return False
             
-        # Blacklists the unique identifier immediately upon first clean arrival.
+        # Βάζει το μοναδικό αναγνωριστικό στη "μαύρη λίστα" αμέσως μόλις ληφθεί για πρώτη φορά.
         nonces.append(nonce)
         NONCE_DB.write_text(json.dumps(nonces, indent=2))
         return True
     except Exception:
         return False
 
-# PART F: Symmetric Authenticated Encryption & Digital Signatures
+# PART F: Συμμετρική Αυθεντικοποιημένη Κρυπτογράφηση & Ψηφιακές Υπογραφές
 def encrypt_file(data: bytes) -> tuple:
     try:
-        # Generates a cryptographically strong, volatile 32-byte symmetric key for AES-256.
+        # Παράγει ένα ισχυρό, πτητικό συμμετρικό κλειδί 32 bytes για τον αλγόριθμο AES-256.
         key = os.urandom(32)
-        # Generates an essential, unique 12-byte initialization vector (nonce) for GCM mode.
-        # Prevents deterministic patterns if identical plaintext content blocks are encrypted.
+        # Παράγει ένα απαραίτητο, μοναδικό διάνυσμα αρχικοποίησης (IV / nonce) 12 bytes για το GCM mode.
+        # Αποτρέπει τη δημιουργία πανομοιότυπων μοτίβων (ciphertext) αν κρυπτογραφηθούν ίδια αρχεία.
         nonce_aes = os.urandom(12)
         
-        # Utilizes AES-GCM mode providing Authenticated Encryption with Associated Data (AEAD).
-        # Simultaneously guarantees Confidentiality (privacy) and Integrity/Authenticity (tamper detection).
+        # Χρησιμοποιεί AES-GCM, προσφέροντας Authenticated Encryption with Associated Data (AEAD).
+        # Εγγυάται ταυτόχρονα την Εμπιστευτικότητα (κρυπτότητα) και την Ακεραιότητα/Αυθεντικότητα (ανίχνευση αλλοίωσης).
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce_aes, data, None)
         return ciphertext, key, nonce_aes
@@ -212,8 +212,8 @@ def encrypt_file(data: bytes) -> tuple:
 def decrypt_file(ciphertext: bytes, key: bytes, nonce_aes: bytes) -> bytes:
     try:
         aesgcm = AESGCM(key)
-        # Decryption automatically validates the implicit AEAD authentication tag.
-        # Throws an exception if any ciphertext or IV bit was modified, ensuring strict data integrity.
+        # Η αποκρυπτογράφηση επαληθεύει αυτόματα το ενσωματωμένο AEAD authentication tag.
+        # Πετάει exception αν έστω και ένα bit του αρχείου ή του IV έχει αλλοιωθεί, διασφαλίζοντας την ακεραιότητα.
         return aesgcm.decrypt(nonce_aes, ciphertext, None)
     except Exception:
         return b""
@@ -221,12 +221,12 @@ def decrypt_file(ciphertext: bytes, key: bytes, nonce_aes: bytes) -> bytes:
 def sign_data(username: str, data: bytes, nonce: str) -> bytes:
     try:
         private_key = load_private_key(username)
-        # Binds the file content with the application nonce string into an immutable payload.
-        # This ties the cryptographic signature context directly to this specific session transaction request.
+        # Ενώνει τα δεδομένα του αρχείου με το nonce του αιτήματος σε ένα ενιαίο payload.
+        # Αυτό "δένει" την ψηφιακή υπογραφή με τη συγκεκριμένη χρονική συναλλαγή/αίτημα.
         payload = data + nonce.encode()
         
-        # Uses secure RSA-PSS probabilistic padding paired with SHA-256 hashing.
-        # Provides mathematical proof of origin and guarantees Non-Repudiation (uploader cannot deny action).
+        # Χρησιμοποιεί το ασφαλές πρότυπο RSA-PSS (πιθανοτική μορφοποίηση) με SHA-256 hashing.
+        # Παρέχει μαθηματική απόδειξη προέλευσης και εγγυάται τη Μη-Αποποίηση (Non-Repudiation).
         return private_key.sign(
             payload,
             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
@@ -239,8 +239,8 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
     try:
         public_key = load_public_key(username)
         payload = data + nonce.encode()
-        # Uses the uploader's Public Key to cryptographically authenticate authorship.
-        # Throws InvalidSignature if the file data, nonce value, or key pairing do not match perfectly.
+        # Χρησιμοποιεί το Δημόσιο Κλειδί του uploader για να επαληθεύσει την αυθεντικότητα της υπογραφής.
+        # Αποτυγχάνει (InvalidSignature) αν τα δεδομένα, το nonce ή το κλειδί δεν ταιριάζουν απόλυτα.
         public_key.verify(
             sig,
             payload,
@@ -252,7 +252,7 @@ def verify_signature(username: str, data: bytes, nonce: str, sig: bytes) -> bool
         print("[WARNING] Invalid cryptographic signature detected!")
         return False
 
-# PART Z: System Pipelines & Storage Integration
+# PART Z: Διασύνδεση Συστημάτων & Ενοποίηση
 def upload_file(username: str, filepath: str):
     try:
         path = Path(filepath)
@@ -263,10 +263,10 @@ def upload_file(username: str, filepath: str):
         data = path.read_bytes()
         nonce = generate_nonce()
         
-        # Sequence ordering compliance. Signature is drawn across plaintext content and nonce first.
+        # Συμμόρφωση σειράς βημάτων: Η ψηφιακή υπογραφή δημιουργείται πάνω στα plaintext δεδομένα και το nonce πρώτα.
         signature = sign_data(username, data, nonce)
         
-        # Anti-replay enforcement gateway. If nonce assertion fails, execution aborts immediately.
+        # Πύλη ελέγχου anti-replay: Αν το nonce έχει ξαναχρησιμοποιηθεί, η εκτέλεση διακόπτεται αμέσως.
         if not is_nonce_valid(nonce):
             print("[ERROR] Request aborted due to nonce invalidation.")
             return
@@ -274,8 +274,8 @@ def upload_file(username: str, filepath: str):
         ciphertext, key, nonce_aes = encrypt_file(data)
         (STORAGE_DIR / f"{path.name}.enc").write_bytes(ciphertext)
         
-        # Raw binary cryptographic components (signatures, keys, IVs) are converted to safe,
-        # ASCII-compliant Base64 strings to support cross-platform structure persistence inside flat JSON logs.
+        # Τα raw δυαδικά στοιχεία (υπογραφές, κλειδιά, IVs) μετατρέπονται σε ασφαλείς συμβολοσειρές Base64 ASCII.
+        # Αυτό επιτρέπει την ομαλή αποθήκευση δομημένων δεδομένων μέσα σε flat αρχεία JSON.
         metadata = {
             "signature": base64.b64encode(signature).decode('utf-8'),
             "key": base64.b64encode(key).decode('utf-8'),
@@ -308,8 +308,8 @@ def download_file(username: str, filename: str):
         
         plaintext = decrypt_file(ciphertext, key, nonce_aes)
         
-        # Executes asymmetric signature verification on the recovered plaintext.
-        # This guarantees the item was not modified post-upload and mathematically identifies the uploader.
+        # Εκτελεί ασύμμετρη επαλήθευση υπογραφής πάνω στο ανακτημένο plaintext.
+        # Διασφαλίζει ότι το αρχείο δεν τροποποιήθηκε μετά το upload και ταυτοποιεί μαθηματικά τον uploader.
         if verify_signature(metadata["uploader"], plaintext, nonce, signature):
             out_path = Path(f"downloaded_{metadata['original_filename']}")
             out_path.write_bytes(plaintext)
@@ -321,7 +321,7 @@ def download_file(username: str, filename: str):
 
 def show_menu():
     print("\n" + "="*48)
-    print("           Secure File Storage System           ")
+    print("Secure File Storage System")
     print("="*48)
     print(" 1. Register User (with OTP)")
     print(" 2. Login User")
@@ -332,7 +332,7 @@ def show_menu():
 
 def main():
     initialize_system()
-    # Session state tracking variable initialization.
+    # Αρχικοποίηση μεταβλητής κατάστασης (session state).
     logged_in_user = None
     
     while True:
@@ -349,18 +349,18 @@ def main():
             uname = input("Enter username: ").strip()
             pwd = input("Enter password: ").strip()
             if authenticate_user(uname, pwd):
-                # Binding identity state context to active execution scope.
+                # Σύνδεση του ενεργού χρήστη με το runtime scope της εφαρμογής.
                 logged_in_user = uname
                 print(f"[SESSION] Active login session established for: {logged_in_user}")
         elif choice == '3':
-            # Strict Access Control Check. Blocks data interaction pathways unless session identity is active.
+            # Έλεγχος πρόσβασης (Access Control). Μπλοκάρει την αλληλεπίδραση αν δεν υπάρχει ενεργό session.
             if logged_in_user is None:
                 print("[ERROR] Unauthenticated access. Please log in first.")
                 continue
             fpath = input("Enter file path to upload: ").strip()
             upload_file(logged_in_user, fpath)
         elif choice == '4':
-            # Strict Access Control Check. Blocks data interaction pathways unless session identity is active.
+            # Έλεγχος πρόσβασης (Access Control). Μπλοκάρει την αλληλεπίδραση αν δεν υπάρχει ενεργό session.
             if logged_in_user is None:
                 print("[ERROR] Unauthenticated access. Please log in first.")
                 continue
