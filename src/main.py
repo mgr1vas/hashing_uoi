@@ -4,6 +4,7 @@ import auth
 import os
 
 def menu():
+    # Παράγει το μυστικό κλειδί (state secret) για το 2FA στην αρχή της εκτέλεσης του μενού.
     user_secret = auth.generate_secret()
     
     while True:
@@ -25,7 +26,6 @@ def menu():
 
             if choice == '1':
                 algo = input("Choose algorithm (md5, sha1, sha256, sha3): ").strip().lower()
-                # Function now returns both hash and salt
                 file_hash, salt = hashing.get_file_hash(fname, algo)
                 if file_hash and salt:
                     print(f"Hash ({algo}): {file_hash}")
@@ -36,6 +36,8 @@ def menu():
                     print("Error: Could not calculate hash.")
 
             elif choice == '2':
+                # Υλοποίηση Multi-Factor Authentication.
+                # Επιβάλλει ταυτοποίηση out-of-band πριν επιτρέψει την εκτέλεση του ελέγχου ακεραιότητας.
                 if auth.verify_2fa(user_secret):
                     algo = input("Enter algorithm used: ").strip().lower()
                     result = hashing.verify_integrity(fname, algo)
